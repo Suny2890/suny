@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Science Lab Simulator</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --ink: #1b2430;
+      --muted: #657181;
+      --line: #d9e1ea;
+      --panel: #ffffff;
+      --accent: #0b7f91;
+      --accent-2: #d64f35;
+      --green: #2f8f5b;
+      --gold: #d69b2d;
+      --violet: #6d5bd0;
+      --shadow: 0 18px 50px rgba(29, 45, 68, 0.13);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Arial, "Noto Sans KR", sans-serif;
+      background:
+        linear-gradient(135deg, rgba(11, 127, 145, 0.12), transparent 34%),
+        linear-gradient(315deg, rgba(214, 79, 53, 0.11), transparent 38%),
+        var(--bg);
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+    }
+
+    .simulator {
+      width: min(1180px, 100%);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 22px;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 42px);
+      line-height: 1.1;
+      letter-spacing: -1px;
+    }
+
+    /* ☰ 햄버거 메뉴 토글 버튼 스타일 */
+    .menu-toggle {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 48px;
+      height: 48px;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: all 150ms ease;
+      z-index: 20;
+    }
+    .menu-toggle:hover {
+      background: #e8eef5;
+      transform: translateY(-1px);
+    }
+
+    /* 슬라이드 레이어 메뉴 스타일 (실험 탭 컨테이너) */
+    .tabs-overlay {
+      position: fixed;
+      top: 0;
+      right: -320px; /* 처음엔 숨김 */
+      width: 300px;
+      height: 100vh;
+      background: var(--panel);
+      box-shadow: -5px 0 30px rgba(0, 0, 0, 0.15);
+      z-index: 30;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: right 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      overflow-y: auto;
+    }
+    .tabs-overlay.open {
+      right: 0;
+    }
+
+    .menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+      margin-bottom: 8px;
+    }
+    .menu-header h3 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--ink);
+    }
+
+    .tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tab,
+    .command,
+    .icon-button,
+    .sub-btn {
+      border: 0;
+      cursor: pointer;
+      transition: transform 140ms ease, background 140ms ease, color 140ms ease;
+    }
+
+    /* 메뉴 내부의 실험 버튼 스타일 (글자 크기 정상화) */
+    .tab {
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: var(--muted);
+      background: #f8fafc;
+      font-weight: 700;
+      font-size: 15px;
+      border: 1px solid transparent;
+    }
+    .tab:hover {
+      background: #e8eef5;
+      color: var(--ink);
+    }
+    .tab.active {
+      color: #fff;
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    /* 메뉴 활성화 시 외부 딤드(배경 흐리게) 처리 */
+    .menu-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(27, 36, 48, 0.3);
+      z-index: 25;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+    .menu-backdrop.show {
+      display: block;
+    }
+
+    .stage-wrap {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1100 / 620;
+      background: #eef4f8;
+    }
+
+    .readout {
+      position: absolute;
+      right: 18px;
+      top: 18px;
+      width: min(330px, calc(100% - 36px));
+      padding: 16px;
+      border: 1px solid rgba(217, 225, 234, 0.85);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(8px);
+    }
+
+    .readout span,
+    .readout small {
+      display: block;
+      color: var(--muted);
+    }
+
+    .readout strong {
+      display: block;
+      margin: 5px 0;
+      font-size: 28px;
+      line-height: 1.05;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 14px;
+      align-items: stretch;
+      margin-top: 14px;
+    }
+
+    .control,
+    .actions {
+      min-height: 74px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .control span {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .icon-button {
+      width: 46px;
+      height: 46px;
+      border-radius: 8px;
+      color: var(--ink);
+      background: #e8eef5;
+      font-size: 24px;
+    }
+
+    .command {
+      min-width: 92px;
+      height: 46px;
+      padding: 0 16px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--accent);
+      font-weight: 800;
+    }
+
+    .command.secondary {
+      min-width: 72px;
+      color: var(--ink);
+      background: #e8eef5;
+    }
+
+    /* 양자역학 서브메뉴 스타일 */
+    .quantum-selector {
+      display: none;
+      gap: 8px;
+      margin-bottom: 12px;
+      background: rgba(255,255,255,0.6);
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+    }
+    .quantum-selector.show {
+      display: flex;
+    }
+    .sub-btn {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .sub-btn.active {
+      background: var(--violet);
+      color: #fff;
+      border-color: var(--violet);
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(27, 36, 48, 0.42);
+    }
+
+    .modal.open {
+      display: flex;
+    }
+
+    .modal-panel {
+      width: min(720px, 100%);
+      max-height: min(760px, calc(100vh - 48px));
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 20px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .modal-body {
+      padding: 18px 20px 22px;
+      color: var(--ink);
+    }
+
+    .modal-body h3 {
+      margin: 18px 0 8px;
+      font-size: 18px;
+    }
+
+    .modal-body p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .modal-body ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .quiz-options {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .quiz-option {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: #f8fafc;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .quiz-option.correct {
+      border-color: var(--green);
+      background: rgba(47, 143, 91, 0.12);
+    }
+
+    .quiz-option.wrong {
+      border-color: var(--accent-2);
+      background: rgba(214, 79, 53, 0.12);
+    }
+
+    .quiz-feedback {
+      min-height: 24px;
+      margin-top: 12px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        padding: 16px;
+        place-items: start center;
+      }
+
+      .topbar,
+      .controls {
+        grid-template-columns: 1fr;
+        display: grid;
+      }
+
+      .readout {
+        position: static;
+        width: auto;
+        border-width: 1px 0 0;
+        border-radius: 0;
+      }
+
+      .actions {
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="menuBackdrop" class="menu-backdrop"></div>
+
+  <main class="app">
+    <section class="simulator">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Interactive Science Lab</p>
+          <h1>과학 시뮬레이터</h1>
+        </div>
+        <button id="menuToggleBtn" class="menu-toggle" type="button" title="실험 메뉴 열기" aria-label="실험 메뉴 열기">☰</button>
+      </header>
+
+      <nav id="tabsOverlay" class="tabs-overlay" aria-label="시뮬레이션 선택">
+        <div class="menu-header">
+          <h3>실험 목록 선택</h3>
+          <button id="menuCloseBtn" class="icon-button" type="button" title="닫기" style="width:36px; height:36px; font-size:20px;">×</button>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-mode="gravity" type="button">중력 실험</button>
+          <button class="tab" data-mode="electric" type="button">전기장 실험</button>
+          <button class="tab" data-mode="wave" type="button">파동 실험</button>
+          <button class="tab" data-mode="reaction" type="button">화학반응 실험</button>
+          <button class="tab" data-mode="refraction" type="button">빛의 굴절 실험</button>
+          <button class="tab" data-mode="orbit" type="button">행성 궤도 실험</button>
+          <button class="tab" data-mode="gas" type="button">기체 분자 운동</button>
+          <button class="tab" data-mode="induction" type="button">전자기 유도 실험</button>
+          <button class="tab" data-mode="ph" type="button">산과 염기 pH</button>
+          <button class="tab" data-mode="quantum" type="button">양자역학 실험</button>
+          <button class="tab" data-mode="nuclear" type="button">원자력 발전소</button>
+        </div>
+      </nav>
+
+      <div id="quantumSelector" class="quantum-selector">
+        <button id="subTunnelBtn" class="sub-btn active" type="button">양자 터널링 효과</button>
+        <button id="subCatBtn" class="sub-btn" type="button">슈뢰딩거의 고양이</button>
+      </div>
+
+      <section class="stage-wrap">
+        <canvas id="labCanvas" width="1100" height="620" aria-label="과학 시뮬레이션 화면"></canvas>
+        <aside class="readout">
+          <span id="modeLabel">중력 실험</span>
+          <strong id="primaryValue">9.8 m/s²</strong>
+          <small id="secondaryValue">슬라이더로 조건을 바꾸며 결과를 관찰해요.</small>
+        </aside>
+      </section>
+
+      <section class="controls" aria-label="실험 조작 패널">
+        <label class="control">
+          <span id="sliderALabel">중력 가속도</span>
+          <input id="sliderA" type="range" min="1" max="25" value="9.8" step="0.1" />
+        </label>
+        <label class="control">
+          <span id="sliderBLabel">공기 저항</span>
+          <input id="sliderB" type="range" min="0" max="0.08" value="0.018" step="0.001" />
+        </label>
+        <div class="actions">
+          <button id="infoBtn" class="command secondary" type="button">설명</button>
+          <button id="quizBtn" class="command secondary" type="button">퀴즈</button>
+          <button id="resetBtn" class="icon-button" type="button" title="초기화" aria-label="초기화">↺</button>
+          <button id="playBtn" class="command" type="button">일시정지</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="learningModal" class="modal" aria-hidden="true">
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-header">
+        <div>
+          <p id="modalEyebrow" class="eyebrow">Experiment Guide</p>
+          <h2 id="modalTitle">실험 설명</h2>
+        </div>
+        <button id="closeModalBtn" class="icon-button" type="button" title="닫기" aria-label="닫기">×</button>
+      </header>
+      <div id="modalBody" class="modal-body"></div>
+    </section>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("labCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const tabs = [...document.querySelectorAll(".tab")];
+    const sliderA = document.getElementById("sliderA");
+    const sliderB = document.getElementById("sliderB");
+    const sliderALabel = document.getElementById("sliderALabel");
+    const sliderBLabel = document.getElementById("sliderBLabel");
+    const resetBtn = document.getElementById("resetBtn");
+    const playBtn = document.getElementById("playBtn");
+    const infoBtn = document.getElementById("infoBtn");
+    const quizBtn = document.getElementById("quizBtn");
+    const learningModal = document.getElementById("learningModal");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+    const modalEyebrow = document.getElementById("modalEyebrow");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalBody = document.getElementById("modalBody");
+    const modeLabel = document.getElementById("modeLabel");
+    const primaryValue = document.getElementById("primaryValue");
+    const secondaryValue = document.getElementById("secondaryValue");
+
+    // 메뉴 제어용 요소
+    const menuToggleBtn = document.getElementById("menuToggleBtn");
+    const menuCloseBtn = document.getElementById("menuCloseBtn");
+    const tabsOverlay = document.getElementById("tabsOverlay");
+    const menuBackdrop = document.getElementById("menuBackdrop");
+
+    const quantumSelector = document.getElementById("quantumSelector");
+    const subTunnelBtn = document.getElementById("subTunnelBtn");
+    const subCatBtn = document.getElementById("subCatBtn");
+
+    let mode = "gravity";
+    let qSubMode = "tunnel";
+    let running = true;
+    let lastTime = performance.now();
+    let ball;
+    let charges;
+    let molecules;
+    let gasParticles;
+    let planets;
+    let wavePhase = 0;
+    let reactionProgress = 0;
+    let orbitTrace = [];
+    let magnetX = 260;
+    let lastMagnetX = 260;
+    let inductionCurrent = 0;
+
+    let catState = "superposition";
+    let catParticles = [];
+
+    let uAtoms = [];
+    let neutrons = [];
+    let powerOutput = 0;
+    let coreTemp = 300;
+
+    const modes = {
+      gravity: {
+        label: "중력 실험",
+        a: ["중력 가속도", 1, 25, 9.8, 0.1],
+        b: ["공기 저항", 0, 0.08, 0.018, 0.001],
+      },
+      electric: {
+        label: "전기장 실험",
+        a: ["전기장 세기", 0.2, 4, 1.4, 0.1],
+        b: ["입자 전하량", -3, 3, 1, 0.1],
+      },
+      wave: {
+        label: "파동 실험",
+        a: ["진폭", 10, 120, 62, 1],
+        b: ["주파수", 0.5, 6, 2.2, 0.1],
+      },
+      reaction: {
+        label: "화학반응 실험",
+        a: ["온도", 10, 100, 56, 1],
+        b: ["촉매 효과", 0, 1, 0.35, 0.01],
+      },
+      refraction: {
+        label: "빛의 굴절 실험",
+        a: ["입사각", 5, 75, 42, 1],
+        b: ["두 번째 매질 굴절률", 1, 2.4, 1.5, 0.01],
+      },
+      orbit: {
+        label: "행성 궤도 실험",
+        a: ["중심 질량", 0.6, 3, 1.25, 0.05],
+        b: ["초기 속도", 0.55, 1.55, 1, 0.01],
+      },
+      gas: {
+        label: "기체 분자 운동 실험",
+        a: ["온도", 10, 120, 58, 1],
+        b: ["용기 부피", 0.55, 1, 0.82, 0.01],
+      },
+      induction: {
+        label: "전자기 유도 실험",
+        a: ["자석 왕복 속도", 0.2, 3.2, 1.2, 0.1],
+        b: ["코일 감은 수", 4, 18, 10, 1],
+      },
+      ph: {
+        label: "산과 염기 pH 실험",
+        a: ["산 첨가량", 0, 100, 46, 1],
+        b: ["염기 첨가량", 0, 100, 34, 1],
+      },
+      quantum_tunnel: {
+        label: "양자 터널링 효과",
+        a: ["입자 에너지", 20, 100, 55, 1],
+        b: ["장벽 두께", 15, 120, 45, 1],
+      },
+      quantum_cat: {
+        label: "슈뢰딩거의 고양이",
+        a: ["붕괴 확률 배율", 10, 90, 50, 1],
+        b: ["방사능 샘플 불안정성", 1, 5, 3, 0.1],
+      },
+      nuclear: {
+        label: "원자력 발전소 체인 반응 실험",
+        a: ["제어봉 삽입 깊이 (%)", 0, 100, 40, 1],
+        b: ["냉각수 밸브 공급량", 10, 100, 50, 1],
+      }
+    };
+
+    const learningContent = {
+      gravity: {
+        title: "중력 실험",
+        what: "물체가 중력과 공기 저항을 받을 때 어떻게 떨어지고 튕기는지 관찰하는 실험입니다.",
+        how: ["중력 가속도를 높이면 공이 더 빠르게 아래로 가속됩니다.", "공기 저항을 높이면 움직임이 더 빨리 줄어듭니다.", "초기화 버튼으로 같은 조건에서 다시 시작할 수 있습니다."],
+        quiz: {
+          question: "중력 가속도를 크게 하면 공의 낙하 운동은 어떻게 변할까요?",
+          options: ["더 빠르게 아래로 가속된다", "항상 같은 높이에 멈춘다", "공기 저항이 완전히 사라진다"],
+          answer: 0,
+          feedback: "맞아요. 중력 가속도가 커지면 아래 방향 속도가 더 빨리 증가합니다.",
+        },
+      },
+      electric: {
+        title: "전기장 실험",
+        what: "전기장 안에서 양전하와 음전하가 서로 다른 방향으로 힘을 받는 모습을 보여줍니다.",
+        how: ["전기장 세기를 높이면 입자들이 더 강하게 움직입니다.", "입자 전하량의 부호를 바꾸면 힘의 방향도 바뀝니다.", "빨간 입자와 초록 입자의 움직임 차이를 비교해 보세요."],
+        quiz: {
+          question: "전기장 속에서 전하량의 부호가 바뀌면 무엇이 달라질까요?",
+          options: ["힘의 방향이 바뀐다", "질량이 사라진다", "전기장이 파동으로 변한다"],
+          answer: 0,
+          feedback: "정답입니다. 전기력은 전하의 부호에 따라 방향이 달라집니다.",
+        },
+      },
+      wave: {
+        title: "파동 실험",
+        what: "진폭과 주파수를 바꾸며 파동의 모양과 매질 입자의 진동을 관찰하는 실험입니다.",
+        how: ["진폭을 높이면 파동의 위아래 흔들림이 커집니다.", "주파수를 높이면 더 촘촘한 파동이 나타납니다.", "빨간 점은 매질의 일부가 진동하는 모습을 나타냅니다."],
+        quiz: {
+          question: "진폭을 크게 하면 파동에서 무엇이 커질까요?",
+          options: ["위아래 흔들림의 크기", "pH 값", "코일 감은 수"],
+          answer: 0,
+          feedback: "좋아요. 진폭은 평형 위치에서 얼마나 크게 흔들리는지를 뜻합니다.",
+        },
+      },
+      reaction: {
+        title: "화학반응 실험",
+        what: "A 입자와 B 입자가 충돌해 AB 생성물로 바뀌는 과정을 단순화해 보여줍니다.",
+        how: ["온도를 높이면 입자 운동이 빨라져 충돌이 늘어납니다.", "촉매 효과를 높이면 반응이 일어날 확률이 커집니다.", "노란 AB 입자가 많아질수록 반응 진행률이 올라갑니다."],
+        quiz: {
+          question: "촉매는 보통 화학반응에 어떤 영향을 줄까요?",
+          options: ["반응이 더 쉽게 일어나도록 돕는다", "생성물을 모두 없앤다", "입자의 전하를 반드시 바꾼다"],
+          answer: 0,
+          feedback: "맞습니다. 촉매는 반응 경로를 바꾸어 반응이 더 쉽게 일어나게 돕습니다.",
+        },
+      },
+      refraction: {
+        title: "빛의 굴절 실험",
+        what: "빛이 공기에서 다른 매질로 들어갈 때 진행 방향이 꺾이는 현상을 보여줍니다.",
+        how: ["입사각을 바꾸며 빛이 경계면에 들어오는 각도를 조절합니다.", "굴절률을 높이면 빛이 법선 쪽으로 더 많이 꺾입니다.", "붉은 선은 들어오는 빛, 푸른 선은 굴절된 빛입니다."],
+        quiz: {
+          question: "공기보다 굴절률이 큰 매질로 빛이 들어가면 보통 어느 쪽으로 꺾일까요?",
+          options: ["법선 쪽", "항상 수평 방향", "빛의 반대 방향"],
+          answer: 0,
+          feedback: "정답이에요. 느린 매질로 들어가면 빛은 법선 쪽으로 굴절합니다.",
+        },
+      },
+      orbit: {
+        title: "행성 궤도 실험",
+        what: "중심 천체의 질량과 행성의 초기 속도가 궤도를 어떻게 바꾸는지 관찰합니다.",
+        how: ["중심 질량을 높이면 행성을 끌어당기는 힘이 커집니다.", "초기 속도를 바꾸면 궤도가 더 둥글거나길쭉해질 수 있습니다.", "궤적 선을 보며 안정적인 궤도인지 확인해 보세요."],
+        quiz: {
+          question: "중심 질량이 커지면 행성에 작용하는 중력은 어떻게 될까요?",
+          options: ["더 커진다", "항상 0이 된다", "색만 바꾼다"],
+          answer: 0,
+          feedback: "맞아요. 중심 질량이 커질수록 행성을 끌어당기는 중력도 커집니다.",
+        },
+      },
+      gas: {
+        title: "기체 분자 운동 실험",
+        what: "기체 분자가 용기 안에서 끊임없이 움직이고 벽에 충돌해 압력을 만드는 과정을 보여줍니다.",
+        how: ["온도를 높이면 분자들이 더 빠르게 움직입니다.", "용기 부피를 줄이면 같은 분자들이 더 좁은 공간에서 자주 충돌합니다.", "압력 표시값이 조건에 따라 어떻게 변하는지 비교해 보세요."],
+        quiz: {
+          question: "온도가 올라가면 기체 분자의 평균 운동은 어떻게 변할까요?",
+          options: ["더 활발해진다", "완전히 멈춘다", "분자가 모두 액체가 된다"],
+          answer: 0,
+          feedback: "좋아요. 온도가 높을수록 분자의 평균 운동 에너지가 커집니다.",
+        },
+      },
+      induction: {
+        title: "전자기 유도 실험",
+        what: "자석이 코일 근처에서 움직일 때 전류가 유도되는 현상을 시각화한 실험입니다.",
+        how: ["자석 왕복 속도를 높이면 유도 전류 변화가 커집니다.", "코일 감은 수를 늘리면 유도 효과가 강해집니다.", "전류계 막대의 색과 크기로 방향과 세기를 확인하세요."],
+        quiz: {
+          question: "전자기 유도에서 유도 전류가 생기려면 무엇이 변해야 할까요?",
+          options: ["코일을 지나는 자기 선속", "화학 용액의 pH", "공의 반지름"],
+          answer: 0,
+          feedback: "정답입니다. 자기 선속이 변할 때 유도 전류가 생깁니다.",
+        },
+      },
+      ph: {
+        title: "산과 염기 pH 실험",
+        what: "산과 염기를 섞을 때 용액의 pH와 색이 어떻게 변하는지 보여줍니다.",
+        how: ["산 첨가량을 늘리면 pH가 낮아져 산성에 가까워집니다.", "염기 첨가량을 늘리면 pH가 높아져 염기성에 가까워집니다.", "pH 7 근처는 중성으로 볼 수 있습니다."],
+        quiz: {
+          question: "pH가 7보다 작으면 보통 어떤 성질에 가깝나요?",
+          options: ["산성", "염기성", "중력장"],
+          answer: 0,
+          feedback: "맞아요. pH 7보다 작으면 산성, 7보다 크면 염기성에 가깝습니다.",
+        },
+      },
+      quantum_tunnel: {
+        title: "양자 터널링 효과",
+        what: "고전 역학에서는 통과할 수 없는 에너지 장벽을 미시세계의 입자가 '확률적 파동' 상태가 되어 통과해 버리는 현상입니다.",
+        how: ["입자 에너지가 높을수록 장벽을 통과하여 살아남는 우측 파동의 진폭이 커집니다.", "장벽의 두께가 얇을수록 터널링하여 통과할 확률이 비약적으로 증가합니다.", "장벽 내부에서 파동의 진폭이 급격히 지수 감소하는 모습을 관찰해 보세요."],
+        quiz: {
+          question: "양자 터널링 현상에서 입자가 장벽을 통과할 확률을 높이려면 조건이 어떻게 변해야 할까요?",
+          options: ["장벽의 두께가 더 얇아진다", "입자의 질량이 무한대가 된다", "장벽의 높이를 통과 불가능할 정도로 무한히 높인다"],
+          answer: 0,
+          feedback: "정답입니다! 장벽이 얇고 입자의 에너지가 높을수록 통과 확률 파동이 장벽 너머까지 도달하기 쉬워집니다.",
+        }
+      },
+      quantum_cat: {
+        title: "슈뢰딩거의 고양이",
+        what: "양자역학의 중첩 상태를 설명하기 위한 사고실험입니다. 상자를 열어 관측하기 전까지 고양이는 '살아있는 상태'와 '죽어있는 상태'가 동시에 공존합니다.",
+        how: ["상자가 닫혀 있을 때는 두 상태가 서로 중첩되어 반투명하게 겹쳐 보입니다.", "우측 하단의 [관측하기] 버튼을 누르면 파동함수가 붕괴하며 상태가 100% 하나로 결정됩니다.", "불안정성을 조절하여 시간에 따라 핵이 붕괴될 확률의 변화 속도를 제어할 수 있습니다."],
+        quiz: {
+          question: "양자역학에서 미시적인 상태가 하나의 확실한 현실로 결정되는 계기는 무엇일까요?",
+          options: ["외부 관측자의 '관측(Measurement)' 행위", "단순한 시간의 흐름", "상자의 색상 변화"],
+          answer: 0,
+          feedback: "맞습니다! 관측되지 않은 상태에서는 확률적 중첩으로 존재하다가, 관측하는 순간 파동함수의 붕괴가 일어납니다.",
+        }
+      },
+      nuclear: {
+        title: "원자력 발전소 실험",
+        what: "원자로 내부에서 우라늄 원자핵이 중성자와 충돌하여 쪼개지는 '핵분열 연쇄 반응'을 안전하게 제어하는 실험입니다.",
+        how: [
+          "우라늄 원자에 중성자가 부딪히면 핵분열이 일어나며 추가 중성자와 열에너지가 발생합니다.",
+          "제어봉 삽입 깊이를 낮추면 중성자가 흡수되지 않아 연쇄 반응이 증폭되고 전력 및 온도가 치솟습니다.",
+          "냉각수 공급량을 조절해 원자로의 과열을 막아 안전하게 발전소를 운영해 보세요."
+        ],
+        quiz: {
+          question: "원자력 발전소에서 중성자를 흡수하여 핵분열 연쇄 반응 속도를 늦추거나 멈추는 장치는 무엇일까요?",
+          options: ["제어봉 (Control Rod)", "터빈 발전기", "우라늄 연료봉"],
+          answer: 0,
+          feedback: "정답입니다! 붕소나 카드뮴으로 만든 제어봉은 중성자를 빨아들여 반응을 억제하는 핵심 안전장치입니다."
+        }
+      }
+    };
+
+    // 메뉴 열기/닫기 토글 함수
+    function toggleMenu(open) {
+      if (open) {
+        tabsOverlay.classList.add("open");
+        menuBackdrop.classList.add("show");
+      } else {
+        tabsOverlay.classList.remove("open");
+        menuBackdrop.classList.remove("show");
+      }
+    }
+
+    menuToggleBtn.addEventListener("click", () => toggleMenu(true));
+    menuCloseBtn.addEventListener("click", () => toggleMenu(false));
+    menuBackdrop.addEventListener("click", () => toggleMenu(false));
+
+    function configureSliders() {
+      let currentModeKey = mode;
+      if (mode === "quantum") {
+        currentModeKey = qSubMode === "tunnel" ? "quantum_tunnel" : "quantum_cat";
+      }
+
+      const config = modes[currentModeKey];
+      const [labelA, minA, maxA, valueA, stepA] = config.a;
+      const [labelB, minB, maxB, valueB, stepB] = config.b;
+
+      sliderALabel.textContent = labelA;
+      sliderBLabel.textContent = labelB;
+      sliderA.min = minA;
+      sliderA.max = maxA;
+      sliderA.value = valueA;
+      sliderA.step = stepA;
+      sliderB.min = minB;
+      sliderB.max = maxB;
+      sliderB.value = valueB;
+      sliderB.step = stepB;
+      modeLabel.textContent = config.label;
+
+      if (currentModeKey === "quantum_cat") {
+        playBtn.textContent = catState === "superposition" ? "관측하기" : "다시 닫기";
+      } else {
+        playBtn.textContent = running ? "일시정지" : "재생";
+      }
+    }
+
+    function resetSimulation() {
+      ball = { x: 185, y: 90, radius: 27, vx: 148, vy: 0 };
+      charges = Array.from({ length: 34 }, (_, index) => ({
+        x: 120 + (index % 9) * 98,
+        y: 105 + Math.floor(index / 9) * 94,
+        vx: 0,
+        vy: 0,
+        charge: index % 2 === 0 ? 1 : -1,
+      }));
+      molecules = Array.from({ length: 28 }, (_, index) => ({
+        x: 90 + Math.random() * 900,
+        y: 105 + Math.random() * 390,
+        vx: (Math.random() - 0.5) * 90,
+        vy: (Math.random() - 0.5) * 90,
+        kind: index % 2 === 0 ? "A" : "B",
+        reacted: false,
+        flash: 0,
+      }));
+      gasParticles = Array.from({ length: 52 }, () => ({
+        x: 210 + Math.random() * 680,
+        y: 130 + Math.random() * 330,
+        vx: (Math.random() - 0.5) * 150,
+        vy: (Math.random() - 0.5) * 150,
+        r: 5 + Math.random() * 4,
+      }));
+      planets = [
+        { x: 550, y: 310, vx: 0, vy: 0, radius: 34, color: "#d69b2d", fixed: true },
+        { x: 550, y: 132, vx: 122 * Number(sliderB.value), vy: 0, radius: 13, color: "#0b7f91" },
+        { x: 550, y: 468, vx: -88 * Number(sliderB.value), vy: 0, radius: 9, color: "#d64f35" },
+      ];
+      wavePhase = 0;
+      reactionProgress = 0;
+      orbitTrace = [];
+      magnetX = 260;
+      lastMagnetX = 260;
+      inductionCurrent = 0;
+
+      catState = "superposition";
+      catParticles = Array.from({ length: 20 }, () => ({
+        x: 650 + Math.random() * 250,
+        y: 240 + Math.random() * 180,
+        vx: (Math.random() - 0.5) * 90,
+        vy: (Math.random() - 0.5) * 90,
+      }));
+
+      uAtoms = [];
+      for(let i=0; i<6; i++) {
+        for(let j=0; j<4; j++) {
+          uAtoms.push({ x: 220 + i*110, y: 220 + j*85, split: false, energyFlash: 0 });
+        }
+      }
+      neutrons = Array.from({ length: 12 }, () => ({
+        x: 150 + Math.random()*600,
+        y: 150 + Math.random()*300,
+        vx: (Math.random() - 0.5) * 220,
+        vy: (Math.random() - 0.5) * 220
+      }));
+      powerOutput = 50;
+      coreTemp = 320;
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === mode));
+      
+      if (mode === "quantum") {
+        quantumSelector.classList.add("show");
+      } else {
+        quantumSelector.classList.remove("show");
+      }
+
+      toggleMenu(false); // 실험 탭 선택 시 메뉴 자동으로 닫기
+      configureSliders();
+      resetSimulation();
+    }
+
+    function openLearningModal(kind) {
+      let currentModeKey = mode;
+      if (mode === "quantum") {
+        currentModeKey = qSubMode === "tunnel" ? "quantum_tunnel" : "quantum_cat";
+      }
+
+      const content = learningContent[currentModeKey];
+      modalEyebrow.textContent = kind === "quiz" ? "Quiz Mode" : "Experiment Guide";
+      modalTitle.textContent = kind === "quiz" ? `${content.title} 퀴즈` : `${content.title} 설명`;
+      modalBody.innerHTML = kind === "quiz" ? buildQuizHtml(content) : buildInfoHtml(content);
+      learningModal.classList.add("open");
+      learningModal.setAttribute("aria-hidden", "false");
+
+      if (kind === "quiz") {
+        const options = [...modalBody.querySelectorAll(".quiz-option")];
+        const feedback = modalBody.querySelector(".quiz-feedback");
+        options.forEach((button, index) => {
+          button.addEventListener("click", () => {
+            options.forEach((option) => option.disabled = true);
+            const correct = index === content.quiz.answer;
+            button.classList.add(correct ? "correct" : "wrong");
+            options[content.quiz.answer].classList.add("correct");
+            feedback.textContent = correct ? content.quiz.feedback : `아쉽지만 정답은 "${content.quiz.options[content.quiz.answer]}"입니다.`;
+          });
+        });
+      }
+    }
+
+    function buildInfoHtml(content) {
+      const steps = content.how.map((item) => `<li>${item}</li>`).join("");
+      return `
+        <h3>무엇을 하는 실험인가요?</h3>
+        <p>${content.what}</p>
+        <h3>어떻게 실험하나요?</h3>
+        <ul>${steps}</ul>
+      `;
+    }
+
+    function buildQuizHtml(content) {
+      const options = content.quiz.options
+        .map((option) => `<button class="quiz-option" type="button">${option}</button>`)
+        .join("");
+      return `
+        <h3>${content.quiz.question}</h3>
+        <div class="quiz-options">${options}</div>
+        <p class="quiz-feedback" aria-live="polite"></p>
+      `;
+    }
+
+    function closeLearningModal() {
+      learningModal.classList.remove("open");
+      learningModal.setAttribute("aria-hidden", "true");
+    }
+
+    function clearStage() {
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, "#eaf3f7");
+      gradient.addColorStop(0.55, "#f8fbfd");
+      gradient.addColorStop(1, "#e9f0ea");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = "rgba(27, 36, 48, 0.07)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= canvas.width; x += 55) line(x, 0, x, canvas.height);
+      for (let y = 0; y <= canvas.height; y += 55) line(0, y, canvas.width, y);
+    }
+
+    function line(x1, y1, x2, y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function drawLabel(text, x, y, color = "#1b2430") {
+      ctx.fillStyle = color;
+      ctx.font = "700 18px Arial";
+      ctx.fillText(text, x, y);
+    }
+
+    function circle(x, y, r, color) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    function drawGround() {
+      ctx.fillStyle = "#dbe7df";
+      ctx.fillRect(0, 535, canvas.width, 85);
+      ctx.fillStyle = "#b9cbbb";
+      ctx.fillRect(0, 535, canvas.width, 6);
+    }
+
+    function drawGravity(dt) {
+      const gravity = Number(sliderA.value);
+      const drag = Number(sliderB.value);
+
+      if (running) {
+        ball.vy += gravity * 42 * dt;
+        ball.vx *= 1 - drag;
+        ball.vy *= 1 - drag;
+        ball.x += ball.vx * dt;
+        ball.y += ball.vy * dt;
+        if (ball.y + ball.radius > 535) {
+          ball.y = 535 - ball.radius;
+          ball.vy *= -0.76;
+        }
+        if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) ball.vx *= -0.9;
+      }
+
+      drawGround();
+      ctx.fillStyle = "rgba(11, 127, 145, 0.15)";
+      ctx.fillRect(82, 82, 206, 454);
+      drawLabel("낙하 구간", 112, 124);
+      circle(ball.x, ball.y, ball.radius, "#d64f35");
+      ctx.strokeStyle = "#8f2e21";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.strokeStyle = "#0b7f91";
+      ctx.lineWidth = 5;
+      line(ball.x, ball.y - 62, ball.x, ball.y - 10);
+
+      primaryValue.textContent = `${gravity.toFixed(1)} m/s²`;
+      secondaryValue.textContent = `속도 ${Math.abs(ball.vy / 42).toFixed(1)} m/s, 공기 저항 ${drag.toFixed(3)}`;
+    }
+
+    function drawElectric(dt) {
+      const field = Number(sliderA.value);
+      const charge = Number(sliderB.value);
+
+      for (let x = 80; x < canvas.width; x += 105) {
+        ctx.strokeStyle = "#0b7f91";
+        ctx.lineWidth = 3;
+        line(x, 80, x, canvas.height - 80);
+        circle(x, canvas.height - 75, 5, "#0b7f91");
+      }
+
+      if (running) {
+        charges.forEach((particle) => {
+          const force = field * charge * particle.charge;
+          particle.vy += force * 24 * dt;
+          particle.vx += Math.sin((particle.y + particle.x) * 0.014) * dt * 18;
+          particle.x += particle.vx * dt;
+          particle.y += particle.vy * dt;
+          if (particle.y < 38 || particle.y > canvas.height - 38) particle.vy *= -0.75;
+          if (particle.x < 38 || particle.x > canvas.width - 38) particle.vx *= -0.75;
+          particle.x = Math.max(38, Math.min(canvas.width - 38, particle.x));
+          particle.y = Math.max(38, Math.min(canvas.height - 38, particle.y));
+        });
+      }
+
+      charges.forEach((particle) => {
+        circle(particle.x, particle.y, 14, particle.charge > 0 ? "#d64f35" : "#2f8f5b");
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 18px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(particle.charge > 0 ? "+" : "-", particle.x, particle.y + 1);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+      });
+
+      primaryValue.textContent = `${field.toFixed(1)} N/C`;
+      secondaryValue.textContent = `입자 전하량 ${charge.toFixed(1)} C, 양전하와 음전하가 다르게 움직여요.`;
+    }
+
+    function drawWave(dt) {
+      const amplitude = Number(sliderA.value);
+      const frequency = Number(sliderB.value);
+      if (running) wavePhase += dt * frequency * 2.2;
+
+      ctx.strokeStyle = "rgba(27, 36, 48, 0.18)";
+      ctx.lineWidth = 3;
+      line(0, canvas.height / 2, canvas.width, canvas.height / 2);
+
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "#0b7f91";
+      ctx.beginPath();
+      for (let x = 0; x <= canvas.width; x += 5) {
+        const y = canvas.height / 2 + Math.sin(x * 0.018 * frequency + wavePhase) * amplitude;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      for (let x = 80; x < canvas.width; x += 120) {
+        const y = canvas.height / 2 + Math.sin(x * 0.018 * frequency + wavePhase) * amplitude;
+        circle(x, y, 12, "#d64f35");
+      }
+
+      drawLabel("매질 입자가 위아래로 진동하며 파동이 진행됩니다.", 54, 82);
+      primaryValue.textContent = `${amplitude.toFixed(0)} px`;
+      secondaryValue.textContent = `주파수 ${frequency.toFixed(1)} Hz, 마루와 골의 간격을 관찰해요.`;
+    }
+
+    function drawReaction(dt) {
+      const temperature = Number(sliderA.value);
+      const catalyst = Number(sliderB.value);
+      const speed = 0.55 + temperature / 70 + catalyst * 1.8;
+      const reactionChance = (temperature / 100) * (0.35 + catalyst);
+
+      ctx.fillStyle = "rgba(47, 143, 91, 0.08)";
+      ctx.fillRect(70, 82, 960, 414);
+      ctx.strokeStyle = "#2f8f5b";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(70, 82, 960, 414);
+      drawLabel("반응 용기: A + B -> AB", 92, 122);
+
+      if (running) {
+        molecules.forEach((molecule) => {
+          molecule.x += molecule.vx * speed * dt;
+          molecule.y += molecule.vy * speed * dt;
+          molecule.flash = Math.max(0, molecule.flash - dt * 2.5);
+          if (molecule.x < 92 || molecule.x > 1008) molecule.vx *= -1;
+          if (molecule.y < 112 || molecule.y > 476) molecule.vy *= -1;
+          molecule.x = Math.max(92, Math.min(1008, molecule.x));
+          molecule.y = Math.max(112, Math.min(476, molecule.y));
+        });
+
+        for (let i = 0; i < molecules.length; i += 1) {
+          for (let j = i + 1; j < molecules.length; j += 1) {
+            const first = molecules[i];
+            const second = molecules[j];
+            const distance = Math.hypot(first.x - second.x, first.y - second.y);
+            if (!first.reacted && !second.reacted && first.kind !== second.kind && distance < 30 && Math.random() < reactionChance) {
+              first.reacted = true;
+              second.reacted = true;
+              first.flash = 1;
+              second.flash = 1;
+              reactionProgress += 1;
+            }
+          }
+        }
+      }
+
+      molecules.forEach((molecule) => {
+        const color = molecule.reacted ? "#d69b2d" : molecule.kind === "A" ? "#0b7f91" : "#d64f35";
+        circle(molecule.x, molecule.y, molecule.reacted ? 18 : 13, color);
+        if (molecule.flash > 0) {
+          ctx.strokeStyle = `rgba(214, 155, 45, ${molecule.flash})`;
+          ctx.lineWidth = 8;
+          ctx.stroke();
+        }
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 14px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(molecule.reacted ? "AB" : molecule.kind, molecule.x, molecule.y + 1);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+      });
+
+      const reacted = molecules.filter((molecule) => molecule.reacted).length;
+      primaryValue.textContent = `${Math.round((reacted / molecules.length) * 100)}%`;
+      secondaryValue.textContent = `온도 ${temperature.toFixed(0)}°C, 촉매 ${Math.round(catalyst * 100)}%, 충돌 반응 ${reactionProgress}회`;
+    }
+
+    function drawRefraction() {
+      const incidentAngle = Number(sliderA.value);
+      const n1 = 1;
+      const n2 = Number(sliderB.value);
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const incidentRad = (incidentAngle * Math.PI) / 180;
+      const refractedRad = Math.asin(Math.min(0.999, (n1 / n2) * Math.sin(incidentRad)));
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+      ctx.fillRect(0, 0, canvas.width, centerY);
+      ctx.fillStyle = "rgba(11, 127, 145, 0.16)";
+      ctx.fillRect(0, centerY, canvas.width, centerY);
+      ctx.strokeStyle = "#1b2430";
+      ctx.lineWidth = 4;
+      line(0, centerY, canvas.width, centerY);
+      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = "rgba(27, 36, 48, 0.38)";
+      ctx.lineWidth = 2;
+      line(centerX, 70, centerX, 550);
+      ctx.setLineDash([]);
+
+      drawRay(centerX - Math.sin(incidentRad) * 290, centerY - Math.cos(incidentRad) * 290, centerX, centerY, "#d64f35", 7);
+      drawRay(centerX, centerY, centerX + Math.sin(refractedRad) * 300, centerY + Math.cos(refractedRad) * 300, "#0b7f91", 7);
+      drawRay(centerX, centerY, centerX + Math.sin(incidentRad) * 210, centerY - Math.cos(incidentRad) * 210, "rgba(214, 79, 53, 0.38)", 4);
+      circle(centerX, centerY, 10, "#1b2430");
+
+      drawLabel("공기 n=1.00", 70, 92);
+      drawLabel(`매질 n=${n2.toFixed(2)}`, 70, centerY + 52);
+      primaryValue.textContent = `${((refractedRad * 180) / Math.PI).toFixed(1)}°`;
+      secondaryValue.textContent = `입사각 ${incidentAngle.toFixed(0)}°, 굴절률이 커질수록 법선 쪽으로 꺾여요.`;
+    }
+
+    function drawRay(x1, y1, x2, y2, color, width) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      line(x1, y1, x2, y2);
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - Math.cos(angle - 0.35) * 24, y2 - Math.sin(angle - 0.35) * 24);
+      ctx.lineTo(x2 - Math.cos(angle + 0.35) * 24, y2 - Math.sin(angle + 0.35) * 24);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawOrbit(dt) {
+      const mass = Number(sliderA.value);
+      const center = planets[0];
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < 90; i += 1) {
+        ctx.fillStyle = i % 3 === 0 ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.35)";
+        ctx.fillRect((i * 137) % canvas.width, (i * 251) % canvas.height, 2, 2);
+      }
+
+      if (running) {
+        planets.slice(1).forEach((planet) => {
+          const dx = center.x - planet.x;
+          const dy = center.y - planet.y;
+          const distanceSq = Math.max(3600, dx * dx + dy * dy);
+          const distance = Math.sqrt(distanceSq);
+          const force = (240000 * mass) / distanceSq;
+          planet.vx += (dx / distance) * force * dt;
+          planet.vy += (dy / distance) * force * dt;
+          planet.x += planet.vx * dt;
+          planet.y += planet.vy * dt;
+        });
+        orbitTrace.push({ x: planets[1].x, y: planets[1].y });
+        if (orbitTrace.length > 260) orbitTrace.shift();
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      orbitTrace.forEach((point, index) => (index === 0 ? ctx.moveTo(point.x, point.y) : ctx.lineTo(point.x, point.y)));
+      ctx.stroke();
+      circle(center.x, center.y, center.radius + mass * 4, center.color);
+      planets.slice(1).forEach((planet) => circle(planet.x, planet.y, planet.radius, planet.color));
+
+      drawLabel("중심 질량과 초기 속도가 궤도 안정성을 바꿉니다.", 54, 82, "#fff");
+      primaryValue.textContent = `${mass.toFixed(2)} M`;
+      secondaryValue.textContent = `초기 속도 배율 ${Number(sliderB.value).toFixed(2)}x, 궤적 길이 ${orbitTrace.length}`;
+    }
+
+    function drawGas(dt) {
+      const temperature = Number(sliderA.value);
+      const volume = Number(sliderB.value);
+      const boxW = 410 + volume * 500;
+      const boxH = 340;
+      const left = (canvas.width - boxW) / 2;
+      const top = 135;
+      const speed = 0.55 + temperature / 55;
+      let wallHits = 0;
+
+      ctx.fillStyle = "rgba(11, 127, 145, 0.08)";
+      ctx.fillRect(left, top, boxW, boxH);
+      ctx.strokeStyle = "#0b7f91";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(left, top, boxW, boxH);
+
+      if (running) {
+        gasParticles.forEach((particle) => {
+          particle.x += particle.vx * speed * dt;
+          particle.y += particle.vy * speed * dt;
+          if (particle.x < left + particle.r || particle.x > left + boxW - particle.r) {
+            particle.vx *= -1;
+            wallHits += 1;
+          }
+          if (particle.y < top + particle.r || particle.y > top + boxH - particle.r) {
+            particle.vy *= -1;
+            wallHits += 1;
+          }
+          particle.x = Math.max(left + particle.r, Math.min(left + boxW - particle.r, particle.x));
+          particle.y = Math.max(top + particle.r, Math.min(top + boxH - particle.r, particle.y));
+        });
+      }
+
+      gasParticles.forEach((particle) => circle(particle.x, particle.y, particle.r, "#d64f35"));
+      const pressure = (temperature / 60) / volume;
+      drawLabel("온도가 높거나 부피가 작으면 벽과 더 자주 충돌합니다.", 70, 92);
+      primaryValue.textContent = `${pressure.toFixed(2)} atm`;
+      secondaryValue.textContent = `온도 ${temperature.toFixed(0)}°C, 부피 ${(volume * 100).toFixed(0)}%, 순간 충돌 ${wallHits}회`;
+    }
+
+    function drawInduction(dt) {
+      const speed = Number(sliderA.value);
+      const turns = Number(sliderB.value);
+      const coilX = 690;
+      const coilY = 305;
+      const coilR = 96;
+
+      if (running) {
+        lastMagnetX = magnetX;
+        magnetX = 280 + Math.sin(wavePhase) * 235;
+        wavePhase += dt * speed * 2.2;
+        inductionCurrent = ((magnetX - lastMagnetX) / Math.max(dt, 0.001)) * turns * 0.0012;
+      } else {
+        inductionCurrent *= 0.94;
+      }
+
+      drawLabel("자석이 코일을 지나갈 때 자기 선속이 변해 전류가 유도됩니다.", 54, 82);
+
+      for (let i = 0; i < turns; i += 1) {
+        const offset = (i - turns / 2) * 5;
+        ctx.strokeStyle = i % 2 === 0 ? "#0b7f91" : "#2f8f5b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(coilX + offset, coilY, coilR * 0.36, coilR, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const fieldAlpha = Math.min(0.6, Math.abs(inductionCurrent) / 5);
+      ctx.strokeStyle = `rgba(214, 79, 53, ${fieldAlpha})`;
+      ctx.lineWidth = 5;
+      for (let y = 180; y <= 430; y += 50) {
+        line(magnetX + 80, y, coilX - 90, y + Math.sin(y * 0.03 + wavePhase) * 18);
+      }
+
+      ctx.fillStyle = "#d64f35";
+      ctx.fillRect(magnetX - 70, 255, 70, 100);
+      ctx.fillStyle = "#0b7f91";
+      ctx.fillRect(magnetX, 255, 70, 100);
+      ctx.fillStyle = "#fff";
+      ctx.font = "700 22px Arial";
+      ctx.fillText("N", magnetX - 45, 313);
+      ctx.fillText("S", magnetX + 25, 313);
+
+      ctx.fillStyle = inductionCurrent >= 0 ? "#d64f35" : "#0b7f91";
+      ctx.fillRect(835, 270, 34, Math.max(12, Math.min(120, Math.abs(inductionCurrent) * 18)));
+      drawLabel("전류계", 810, 245);
+
+      primaryValue.textContent = `${inductionCurrent.toFixed(2)} A`;
+      secondaryValue.textContent = `자석 속도 ${speed.toFixed(1)}x, 코일 ${turns.toFixed(0)}회, 방향은 색으로 표시돼요.`;
+    }
+
+    function drawPh() {
+      const acid = Number(sliderA.value);
+      const base = Number(sliderB.value);
+      const ph = Math.max(0, Math.min(14, 7 + (base - acid) / 12));
+      const mix = ph / 14;
+      const r = Math.round(214 * (1 - mix) + 44 * mix);
+      const g = Math.round(79 * (1 - mix) + 143 * mix);
+      const b = Math.round(53 * (1 - mix) + 91 * mix);
+      const color = `rgb(${r}, ${g}, ${b})`;
+
+      ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillRect(155, 80, 790, 455);
+      ctx.strokeStyle = "#1b2430";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(155, 80, 790, 455);
+      ctx.fillStyle = color;
+      ctx.fillRect(200, 205, 700, 245);
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(200, 205, 700, 40);
+      drawLabel("산", 210, 152, "#d64f35");
+      drawLabel("중성", 515, 152, "#657181");
+      drawLabel("염기", 835, 152, "#0b7f91");
+
+      for (let i = 0; i <= 14; i += 1) {
+        const x = 210 + i * 48;
+        ctx.strokeStyle = "#1b2430";
+        ctx.lineWidth = i === Math.round(ph) ? 5 : 2;
+        line(x, 165, x, 185);
+        if (i % 2 === 0) {
+          ctx.fillStyle = "#1b2430";
+          ctx.font = "12px Arial";
+          ctx.fillText(String(i), x - 4, 202);
+        }
+      }
+      const markerX = 210 + ph * 48;
+      circle(markerX, 174, 13, "#d69b2d");
+
+      const state = ph < 6.5 ? "산성" : ph > 7.5 ? "염기성" : "중성";
+      primaryValue.textContent = `pH ${ph.toFixed(1)}`;
+      secondaryValue.textContent = `산 ${acid.toFixed(0)} mL, 염기 ${base.toFixed(0)} mL, 현재 ${state} 용액입니다.`;
+    }
+
+    function drawQuantum(dt) {
+      if (qSubMode === "tunnel") {
+        drawQuantumTunnel(dt);
+      } else {
+        drawQuantumCat(dt);
+      }
+    }
+
+    function drawQuantumTunnel(dt) {
+      const energy = Number(sliderA.value);
+      const barrierWidth = Number(sliderB.value);
+      const barrierX = 480;
+      const barrierH = 340;
+
+      if (running) wavePhase += dt * 6.5;
+
+      ctx.fillStyle = "rgba(27, 36, 48, 0.45)";
+      ctx.fillRect(barrierX, 160, barrierWidth, barrierH);
+      ctx.strokeStyle = "var(--ink)";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(barrierX, 160, barrierWidth, barrierH);
+      drawLabel("에너지 장벽 (Potential Barrier)", barrierX - 20, 140, "var(--accent-2)");
+
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+
+      let tunnelProbability = Math.exp(-0.04 * (110 - energy) * (barrierWidth / 25));
+      if (tunnelProbability > 1) tunnelProbability = 1;
+
+      for (let x = 80; x < canvas.width - 80; x += 3) {
+        let y = 330;
+        if (x < barrierX) {
+          y += Math.sin(x * 0.04 - wavePhase) * 65;
+        } else if (x >= barrierX && x <= barrierX + barrierWidth) {
+          const progress = (x - barrierX) / barrierWidth;
+          const factor = Math.exp(-progress * 3.5);
+          y += Math.sin(x * 0.04 - wavePhase) * 65 * ((1 - factor) * tunnelProbability + factor);
+        } else {
+          y += Math.sin(x * 0.04 - wavePhase) * 65 * tunnelProbability;
+        }
+
+        if (x === 80) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = "var(--violet)";
+      ctx.stroke();
+
+      drawLabel("확률 파동 𝜳(x)", 90, 220, "var(--violet)");
+
+      primaryValue.textContent = `통과 확률: ${(tunnelProbability * 100).toFixed(1)}%`;
+      secondaryValue.textContent = `입자 에너지: ${energy} eV | 장벽 두께: ${barrierWidth} nm`;
+    }
+
+    function drawQuantumCat(dt) {
+      const pFactor = Number(sliderA.value);
+      const instability = Number(sliderB.value);
+      const boxX = 140, boxY = 160, boxW = 400, boxH = 340;
+
+      ctx.fillStyle = "rgba(109, 91, 208, 0.06)";
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.strokeStyle = "var(--violet)";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+      ctx.fillStyle = "rgba(27, 36, 48, 0.08)";
+      ctx.fillRect(620, boxY, 340, boxH);
+      ctx.strokeStyle = "var(--line)";
+      ctx.strokeRect(620, boxY, 340, boxH);
+      drawLabel("방사성 가이거 계측 장치", 640, 195);
+
+      if (catState === "superposition" && running) {
+        wavePhase += dt * instability;
+        catParticles.forEach(p => {
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          if (p.x < 630 || p.x > 950) p.vx *= -1;
+          if (p.y < 170 || p.y > 490) p.vy *= -1;
+        });
+      }
+
+      catParticles.forEach(p => {
+        circle(p.x, p.y, 6, "var(--accent)");
+      });
+
+      const decayChance = Math.min(99.9, (1 - Math.exp(-wavePhase * (pFactor / 100))) * 100);
+
+      if (catState === "superposition") {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = "var(--green)";
+        ctx.beginPath(); ctx.ellipse(340, 340, 65, 45, 0, 0, Math.PI*2); ctx.fill();
+        drawLabel("살아있음 (중첩)", 290, 345, "#fff");
+
+        ctx.globalAlpha = 0.45;
+        ctx.fillStyle = "var(--accent-2)";
+        ctx.beginPath(); ctx.ellipse(340, 420, 65, 30, 0, 0, Math.PI*2); ctx.fill();
+        drawLabel("사망 (중첩)", 300, 425, "#fff");
+        ctx.restore();
+
+        primaryValue.textContent = `붕괴 확률: ${decayChance.toFixed(1)}%`;
+        secondaryValue.textContent = `원자상태: 미관측 중첩 상태 (살아있음 + 죽어있음)`;
+      } else {
+        if (catState === "alive") {
+          ctx.fillStyle = "var(--green)";
+          ctx.beginPath(); ctx.ellipse(340, 340, 85, 55, 0, 0, Math.PI*2); ctx.fill();
+          drawLabel("살아있음 (확정)", 270, 345, "#fff");
+          primaryValue.textContent = "관측 완료: 생존";
+        } else {
+          ctx.fillStyle = "var(--accent-2)";
+          ctx.beginPath(); ctx.ellipse(340, 420, 85, 35, 0, 0, Math.PI*2); ctx.fill();
+          drawLabel("사망 (확정)", 285, 425, "#fff");
+          primaryValue.textContent = "관측 완료: 붕괴됨";
+        }
+        secondaryValue.textContent = `파동함수 붕괴 발생! 외부 관측자가 결맞음(Decoherence)을 유도함.`;
+      }
+    }
+
+    function drawNuclear(dt) {
+      const controlRodDepth = Number(sliderA.value);
+      const coolantFlow = Number(sliderB.value);
+      const reactorLeft = 140, reactorTop = 160, reactorW = 640, reactorH = 340;
+
+      ctx.fillStyle = "rgba(11, 127, 145, 0.06)";
+      ctx.fillRect(reactorLeft, reactorTop, reactorW, reactorH);
+      ctx.strokeStyle = "var(--ink)";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(reactorLeft, reactorTop, reactorW, reactorH);
+
+      const rodYHeight = (controlRodDepth / 100) * 220;
+      ctx.fillStyle = "rgba(27, 36, 48, 0.85)";
+      for(let i=0; i<5; i++) {
+        const rX = 270 + i*110;
+        ctx.fillRect(rX, reactorTop, 14, rodYHeight);
+        ctx.strokeStyle = "var(--accent-2)";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(rX, reactorTop, 14, rodYHeight);
+      }
+
+      if (running) {
+        neutrons.forEach((n) => {
+          n.x += n.vx * dt;
+          n.y += n.vy * dt;
+
+          if (n.x < reactorLeft + 8 || n.x > reactorLeft + reactorW - 8) n.vx *= -1;
+          if (n.y < reactorTop + 8 || n.y > reactorTop + reactorH - 8) n.vy *= -1;
+
+          if (n.y < reactorTop + rodYHeight) {
+            for(let i=0; i<5; i++) {
+              const rX = 270 + i*110;
+              if (n.x >= rX - 5 && n.x <= rX + 19 && Math.random() < 0.06) {
+                n.x = reactorLeft + 30;
+                n.y = reactorTop + 30;
+                n.vx = (Math.random() - 0.5) * 220;
+                n.vy = (Math.random() - 0.5) * 220;
+              }
+            }
+          }
+
+          uAtoms.forEach((atom) => {
+            if (!atom.split) {
+              const dist = Math.hypot(n.x - atom.x, n.y - atom.y);
+              if (dist < 20) {
+                atom.split = true;
+                atom.energyFlash = 1.0;
+                n.vx = (Math.random() - 0.5) * 250;
+                n.vy = (Math.random() - 0.5) * 250;
+                if (neutrons.length < 120) {
+                  neutrons.push({
+                    x: atom.x, y: atom.y,
+                    vx: (Math.random() - 0.5) * 250, vy: (Math.random() - 0.5) * 250
+                  });
+                }
+              }
+            }
+          });
+        });
+
+        let activeFissions = 0;
+        uAtoms.forEach((atom) => {
+          if (atom.split) {
+            atom.energyFlash -= dt * 1.8;
+            if (atom.energyFlash <= 0) {
+              atom.split = false;
+              atom.energyFlash = 0;
+            } else {
+              activeFissions++;
+            }
+          }
+        });
+
+        powerOutput = activeFissions * 35;
+        const targetTemp = 300 + (powerOutput * 4.5) - (coolantFlow * 2.5);
+        coreTemp += (targetTemp - coreTemp) * dt * 2.0;
+        if (coreTemp < 100) coreTemp = 100;
+      }
+
+      uAtoms.forEach((atom) => {
+        if (atom.split) {
+          ctx.fillStyle = `rgba(214, 79, 53, ${atom.energyFlash})`;
+          circle(atom.x, atom.y, 24, ctx.fillStyle);
+          circle(atom.x, atom.y, 14, "var(--gold)");
+        } else {
+          circle(atom.x, atom.y, 15, "var(--muted)");
+          circle(atom.x, atom.y, 8, "#a1b0c0");
+        }
+      });
+
+      neutrons.forEach((n) => {
+        circle(n.x, n.y, 4, "var(--violet)");
+      });
+
+      ctx.fillStyle = "rgba(27, 36, 48, 0.05)";
+      ctx.fillRect(820, reactorTop, 150, reactorH);
+      ctx.strokeRect(820, reactorTop, 150, reactorH);
+      drawLabel("발전 출력", 845, 195);
+
+      const tPercent = Math.min(100, ((coreTemp - 100) / 700) * 100);
+      ctx.fillStyle = coreTemp > 650 ? "var(--accent-2)" : coreTemp > 480 ? "var(--gold)" : "var(--green)";
+      ctx.fillRect(850, reactorTop + 240, 90, -(tPercent * 1.5));
+      drawLabel("노심 온도", 845, reactorTop + 280);
+
+      drawLabel("회색 중성자가 회색 우라늄 핵을 타격하도록 유도하세요.", reactorLeft, reactorTop + reactorH + 35);
+
+      primaryValue.textContent = `${powerOutput.toFixed(0)} MWe`;
+      secondaryValue.textContent = `노심 온도: ${coreTemp.toFixed(1)} °C | 총 자유 중성자: ${neutrons.length}개`;
+    }
+
+    function frame(now) {
+      const dt = Math.min(0.032, (now - lastTime) / 1000);
+      lastTime = now;
+      clearStage();
+
+      if (mode === "gravity") drawGravity(dt);
+      if (mode === "electric") drawElectric(dt);
+      if (mode === "wave") drawWave(dt);
+      if (mode === "reaction") drawReaction(dt);
+      if (mode === "refraction") drawRefraction();
+      if (mode === "orbit") drawOrbit(dt);
+      if (mode === "gas") drawGas(dt);
+      if (mode === "induction") drawInduction(dt);
+      if (mode === "ph") drawPh();
+      if (mode === "quantum") drawQuantum(dt);
+      if (mode === "nuclear") drawNuclear(dt);
+
+      requestAnimationFrame(frame);
+    }
+
+    tabs.forEach((tab) => tab.addEventListener("click", () => setMode(tab.dataset.mode)));
+    
+    subTunnelBtn.addEventListener("click", () => {
+      qSubMode = "tunnel";
+      subTunnelBtn.classList.add("active");
+      subCatBtn.classList.remove("active");
+      configureSliders();
+      resetSimulation();
+    });
+
+    subCatBtn.addEventListener("click", () => {
+      qSubMode = "cat";
+      subCatBtn.classList.add("active");
+      subTunnelBtn.classList.remove("active");
+      configureSliders();
+      resetSimulation();
+    });
+
+    infoBtn.addEventListener("click", () => openLearningModal("info"));
+    quizBtn.addEventListener("click", () => openLearningModal("quiz"));
+    closeModalBtn.addEventListener("click", closeLearningModal);
+    learningModal.addEventListener("click", (event) => {
+      if (event.target === learningModal) closeLearningModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeLearningModal();
+    });
+    
+    resetBtn.addEventListener("click", resetSimulation);
+    
+    playBtn.addEventListener("click", () => {
+      if (mode === "quantum" && qSubMode === "cat") {
+        if (catState === "superposition") {
+          const pFactor = Number(sliderA.value);
+          const decayChance = Math.min(99.9, (1 - Math.exp(-wavePhase * (pFactor / 100))) * 100);
+          catState = (Math.random() * 100 < decayChance) ? "dead" : "alive";
+          playBtn.textContent = "다시 닫기";
+        } else {
+          catState = "superposition";
+          wavePhase = 0;
+          playBtn.textContent = "관측하기";
+        }
+      } else {
+        running = !running;
+        playBtn.textContent = running ? "일시정지" : "재생";
+      }
+    });
+
+    sliderB.addEventListener("input", () => {
+      if (mode === "orbit" || mode === "gas") resetSimulation();
+    });
+
+    configureSliders();
+    resetSimulation();
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
