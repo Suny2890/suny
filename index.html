@@ -97,11 +97,11 @@
       transform: translateY(-1px);
     }
 
-    /* 슬라이드 레이어 메뉴 스타일 (실험 탭 컨테이너) */
+    
     .tabs-overlay {
       position: fixed;
       top: 0;
-      right: -320px; /* 처음엔 숨김 */
+      right: -320px;
       width: 300px;
       height: 100vh;
       background: var(--panel);
@@ -147,7 +147,7 @@
       transition: transform 140ms ease, background 140ms ease, color 140ms ease;
     }
 
-    /* 메뉴 내부의 실험 버튼 스타일 (글자 크기 정상화) */
+ 
     .tab {
       width: 100%;
       text-align: left;
@@ -169,7 +169,7 @@
       border-color: var(--ink);
     }
 
-    /* 메뉴 활성화 시 외부 딤드(배경 흐리게) 처리 */
+   
     .menu-backdrop {
       position: fixed;
       inset: 0;
@@ -284,7 +284,7 @@
       background: #e8eef5;
     }
 
-    /* 양자역학 서브메뉴 스타일 */
+   
     .quantum-selector {
       display: none;
       gap: 8px;
@@ -535,7 +535,8 @@
     const primaryValue = document.getElementById("primaryValue");
     const secondaryValue = document.getElementById("secondaryValue");
 
-    // 메뉴 제어용 요소
+   
+
     const menuToggleBtn = document.getElementById("menuToggleBtn");
     const menuCloseBtn = document.getElementById("menuCloseBtn");
     const tabsOverlay = document.getElementById("tabsOverlay");
@@ -771,7 +772,7 @@
       }
     };
 
-    // 메뉴 열기/닫기 토글 함수
+    
     function toggleMenu(open) {
       if (open) {
         tabsOverlay.classList.add("open");
@@ -886,7 +887,7 @@
         quantumSelector.classList.remove("show");
       }
 
-      toggleMenu(false); // 실험 탭 선택 시 메뉴 자동으로 닫기
+      toggleMenu(false); 
       configureSliders();
       resetSimulation();
     }
